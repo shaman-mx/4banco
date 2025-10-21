@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Othello AI</title>
+  <style>
+    body {
+      background: #184a2c;
+      color: #f5f5f5;
+      font-family: 'Segoe UI', sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0 10px;
+    }
+
+    h1 {
+      margin-top: 15px;
+      font-size: 1.8rem;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 2px;
+      justify-content: center;
+      margin: 20px auto;
+      max-width: 90vw;
+    }
+
+    .cell {
+      width: 100%;
+      aspect-ratio: 1 / 1; /* Đảm bảo cell luôn là hình vuông */
+      background: #107010;
+      border-radius: 6px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .cell.black::after,
+    .cell.white::after {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 80%;
+      height: 80%;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .cell.black::after { background: black; }
+    .cell.white::after { background: white; }
+
+    .highlight::before {
+      content: "";
+      position: absolute;
+      width: 20%;
+      height: 20%;
+      background-color: white;
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0.9;
+    }
+
+    .highlight::after {
+      content: "";
+      position: absolute;
+      width: 30%;
+      height: 30%;
+      background-color: rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0.4;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin: 10px auto;
+    }
+
+    label, span, button, select {
+      font-size: 1rem;
+    }
+
+    .scoreboard {
+      margin: 10px 0;
+      font-size: 1.1rem;
+    }
+
+    button {
+      background-color: #107010;
+      border: none;
+      color: #fff;
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background-color: #0d5a0d;
+    }
+
+    @media (max-width: 500px) {
+      h1 { font-size: 1.5rem; }
+      .controls { gap: 5px; }
+      label, span, button, select { font-size: 0.9rem; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Cờ Lật - Người vs AI</h1>
+
+  <div class="controls">
+    <label>Độ khó:
+      <select id="depthSelect">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3" selected>3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+      </select>
+    </label>
+    <span>Chọn màu cờ:</span>
+    <label><input type="radio" name="color" value="black" checked> ⚫ Đen</label>
+    <label><input type="radio" name="color" value="white"> ⚪ Trắng</label>
+    <button id="toggleFirst">Người đi trước</button>
+    <button id="reset">Chơi lại</button>
+  </div>
+
+  <div class="scoreboard">
+    ⚪ Trắng: <span id="whiteScore">2</span> |
+    ⚫ Đen: <span id="blackScore">2</span>
+  </div>
+
+  <div class="board" id="board"></div>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
