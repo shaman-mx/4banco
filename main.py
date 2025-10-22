@@ -3,6 +3,7 @@ from ai_modules.ai import get_best_move_from_grid
 import traceback
 import sys
 import logging
+import os
 
 app = Flask(__name__)
 
@@ -40,7 +41,6 @@ def ai_move():
         tb = traceback.format_exc()
         app.logger.error(f"💥 Lỗi xử lý /ai_move: {e}\n{tb}")
         return jsonify({"status": "error", "message": str(e), "trace": tb}), 500
-
 
 if __name__ == "__main__":
     # In log rõ ràng ra console

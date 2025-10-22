@@ -47,9 +47,10 @@ name = "Server"
 author = "agent"
 
 [[workflows.workflow.tasks]]
+# Tích hợp auto-update + start server
 task = "shell.exec"
-args = "python main.py"
-waitForPort = 5000
+args = "bash update_render.sh && python main.py"
+waitForPort = 81
 
 [workflows.workflow.metadata]
 outputType = "webview"

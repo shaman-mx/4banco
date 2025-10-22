@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Othello AI</title>
   <style>
+    /* ==== Giữ nguyên toàn bộ CSS bạn đã gửi ==== */
     body {
       background: #184a2c;
       color: #f5f5f5;
@@ -18,7 +19,27 @@
       margin-top: 15px;
       font-size: 1.8rem;
     }
+#colorToggle {
+  padding: 5px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.2s;
+}
 
+/* Màu cho người chơi đen */
+#colorToggle.black {
+  background-color: #222222;
+  color: white;
+}
+
+/* Màu cho người chơi trắng */
+#colorToggle.white {
+  background-color: #dddddd;
+  color: black;
+  border: 1px solid black;
+    }
     .board {
       display: grid;
       grid-template-columns: repeat(8, 1fr);
@@ -47,8 +68,8 @@
       height: 80%;
       border-radius: 50%;
       transform: translate(-50%, -50%);
+      z-index: 2;
     }
-
     .cell.black::after { background: black; }
     .cell.white::after { background: white; }
 
@@ -69,18 +90,36 @@
       transform: translate(-50%, -50%);
       opacity: 0.9;
     }
-
     .highlight::after {
       content: "";
       position: absolute;
       width: 30%;
       height: 30%;
-      background-color: rgba(255, 255, 255, 0.3);
+      background-color: rgba(255,255,255,0.3);
       border-radius: 50%;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
       opacity: 0.4;
+    }
+
+    .ai-last-move::after {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 20%;
+      height: 20%;
+      border-radius: 10%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 4px 2px rgba(255,255,150,0.2), 0 0 4px 2px rgba(255,255,150,0.1);
+      animation: glow 1.5s infinite alternate;
+      z-index: 1;
+    }
+
+    @keyframes glow {
+      0% { box-shadow: 0 0 6px 2px rgba(255,255,150,0.4), 0 0 15px 5px rgba(255,255,0,0.4); }
+      50% { box-shadow: 0 0 10px 5px rgba(255,255,150,0.8), 0 0 25px 10px rgba(255,255,0,0.6); }
+      50% { box-shadow: 0 0 6px 2px rgba(255,255,0,0.6), 0 0 15px 5px rgba(255,255,0,0.4); }
     }
 
     .controls {
@@ -90,10 +129,6 @@
       align-items: center;
       gap: 10px;
       margin: 10px auto;
-    }
-
-    label, span, button, select {
-      font-size: 1rem;
     }
 
     .scoreboard {
@@ -117,23 +152,26 @@
 
     #boardThumbs {
       display:flex;
-      justify-content:center;
-      gap:10px;
-      margin:10px 0;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
     }
 
     .thumb {
       width: 40px;
       height: 40px;
-      background: #107010;
+      border: 2px solid #107010;
       border-radius: 4px;
-      border: 2px solid #555;
       cursor: pointer;
-      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
 
     .thumb.selected {
       border-color: yellow;
+      box-shadow: 0 0 0px 0px yellow;
     }
 
     @media (max-width: 500px) {
@@ -146,7 +184,9 @@
 <body>
   <h1>Cờ Lật - Người vs AI</h1>
 
+  <!-- ==== Bố cục controls mới ==== -->
   <div class="controls">
+    <!-- Hàng 1: Độ khó -->
     <label>Độ khó:
       <select id="depthSelect">
         <option value="1">1</option>
@@ -158,11 +198,14 @@
         <option value="7">7</option>
       </select>
     </label>
+    <button id="styleToggle">Trắng–Đen</button>
+  </div>
+
+  <div class="controls">
+    <!-- Hàng 2: Chọn màu cờ và toggle lượt đi -->
     <span>Chọn màu cờ:</span>
-    <label><input type="radio" name="color" value="black" checked> ⚫ Đen</label>
-    <label><input type="radio" name="color" value="white"> ⚪ Trắng</label>
-    <button id="toggleFirst">Người đi trước</button>
-    <button id="reset">Chơi lại</button>
+    <button id="colorToggle">Đen</button>
+    <button id="toggleFirst">Người đi trước </button>
   </div>
 
   <div class="scoreboard">
@@ -172,12 +215,16 @@
 
   <div class="board" id="board"></div>
 
-  <!-- Thumbnail previews -->
   <div id="boardThumbs">
     <div class="thumb selected" data-board="default"></div>
     <div class="thumb" data-board="board1"></div>
     <div class="thumb" data-board="board2"></div>
     <div class="thumb" data-board="board3"></div>
+  </div>
+
+  <!-- Hàng cuối: Nút Chơi lại -->
+  <div style="margin-top:20px;">
+   <button id="undo">Undo</button> <button id="reset">Chơi lại</button>
   </div>
 
   <script src="{{ url_for('static', filename='script.js') }}"></script>

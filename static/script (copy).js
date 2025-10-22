@@ -10,6 +10,7 @@ let humanFirst = true;
 let grid = [];
 let currentTurn = 'black';
 let currentBoard = 'default';
+let lastAIMove = null; // Lưu nước đi AI
 
 // Cấu hình các bàn cờ blocked
 const BOARD_CONFIGS = {
@@ -24,7 +25,7 @@ function initGrid(boardName=currentBoard) {
   currentBoard = boardName;
   grid = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
 
-  // Đặt quân mặc định
+  // Đặt quân mặc định trực tiếp, không gọi applyMove
   grid[3][3] = 'white';
   grid[4][4] = 'white';
   grid[3][4] = 'black';
@@ -39,14 +40,13 @@ function initGrid(boardName=currentBoard) {
   }
 
   currentTurn = humanFirst ? playerColor : aiColor;
+  lastAIMove = null; // reset glow khi bắt đầu trận mới
+
   renderBoard();
   updateScore();
   highlightMoves();
 
-  if (currentTurn === aiColor && validMoves(aiColor).length > 0) {
-    setTimeout(() => aiPlay(), 100);
-  }
-
+  if (currentTurn === aiColor) aiPlay();
   renderThumbs();
 }
 
@@ -113,59 +113,158 @@ function highlightMoves() {
   }
 }
 
+// --- Highlight nước đi AI ---
+function highlightLastAIMove(){
+  if(!lastAIMove) return;
+  const [x, y] = lastAIMove;
+  const index = y * SIZE + x;
+  const cells = boardEl.children;
+
+  // Xóa tất cả ô cũ
+  for(let cell of cells){
+    cell.classList.remove('ai-last-move');
+  }
+
+  // Thêm glow cho ô AI vừa đánh
+  cells[index].classList.add('ai-last-move');
+}
+
 // --- Áp dụng nước đi ---
-function applyMove(x, y, color, flips) {
+function applyMove(x, y, color, flips, isInit=false) {
   grid[y][x] = color;
   for (let [fx, fy] of flips) grid[fy][fx] = color;
+
+  // Chỉ lưu nước đi AI nếu không phải khởi tạo bàn
+  if(!isInit){
+    if(color === aiColor){
+      lastAIMove = [x, y];
+    } else {
+      lastAIMove = null;
+    }
+  }
+
   renderBoard();
   updateScore();
   highlightMoves();
+  if(!isInit) highlightLastAIMove(); // chỉ highlight khi không phải khởi tạo
 }
-
 // --- Người chơi click ---
 async function handleMove(x, y) {
   if (currentTurn !== playerColor) return;
   const moves = validMoves(playerColor);
   const move = moves.find(m => m.x === x && m.y === y);
   if (!move) return;
+
   applyMove(x, y, playerColor, move.flips);
+
   currentTurn = aiColor;
   highlightMoves();
+
+  // AI đi hoặc pass nếu hết nước
   if (validMoves(aiColor).length > 0) {
     setTimeout(() => aiPlay(), 100);
   } else {
     currentTurn = playerColor;
     highlightMoves();
+    if (validMoves(playerColor).length === 0) gameOver();
   }
 }
 
 // --- AI đi ---
 async function aiPlay() {
-  const depth = parseInt(depthSelect.value);
-  const res = await fetch("/ai_move", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ grid, depth, aiColor })
-  });
-  const data = await res.json();
-  const move = data.move;
-  if (!move) { currentTurn = playerColor; highlightMoves(); return; }
   const moves = validMoves(aiColor);
-  const m = moves.find(m => m.x === move[0] && m.y === move[1]);
-  if (!m) { currentTurn = playerColor; highlightMoves(); return; }
-  applyMove(m.x, m.y, aiColor, m.flips);
-  currentTurn = playerColor;
-  highlightMoves();
+  if (moves.length === 0) {
+    currentTurn = playerColor;
+    highlightMoves();
+    if (validMoves(playerColor).length === 0) gameOver();
+    return;
+  }
+
+  const depth = parseInt(depthSelect.value);
+
+  try {
+    const res = await fetch("/ai_move", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ grid, depth, aiColor })
+    });
+
+    if (!res.ok) {
+      const txt = await res.text();
+      console.error("Server lỗi:", txt);
+      alert("Server lỗi hoặc không phản hồi!");
+      return;
+    }
+
+    const data = await res.json();
+    if (data.status === "error") {
+      alert("AI gặp lỗi: " + data.message);
+      return;
+    }
+
+    const move = data.move;
+    if (!move) {
+      currentTurn = playerColor;
+      highlightMoves();
+      return;
+    }
+
+    const m = moves.find(mv => mv.x === move[0] && mv.y === move[1]);
+    if (!m) {
+      currentTurn = playerColor;
+      highlightMoves();
+      return;
+    }
+
+    applyMove(m.x, m.y, aiColor, m.flips);
+    currentTurn = playerColor;
+    highlightMoves();
+
+    // Nếu người chơi hết nước
+    if (validMoves(playerColor).length === 0) {
+      currentTurn = aiColor;
+      if (validMoves(aiColor).length === 0) gameOver();
+      else setTimeout(() => aiPlay(), 100);
+    }
+  } catch (err) {
+    console.error("Lỗi kết nối fetch /ai_move:", err);
+    alert("Không thể kết nối server!");
+  }
+}
+
+// --- Game kết thúc ---
+function gameOver() {
+  const white = parseInt(whiteScoreEl.textContent);
+  const black = parseInt(blackScoreEl.textContent);
+  let msg;
+  if (white > black) msg = `Trắng thắng ${white} - ${black}`;
+  else if (black > white) msg = `Đen thắng ${black} - ${white}`;
+  else msg = `Hòa ${white} - ${black}`;
+  alert(msg);
 }
 
 // --- Chọn màu cờ ---
-document.querySelectorAll('input[name="color"]').forEach(radio => {
-  radio.addEventListener('change', e => {
-    playerColor = e.target.value;
-    aiColor = playerColor === 'black' ? 'white' : 'black';
-    initGrid();
-  });
-});
+const colorToggle = document.getElementById("colorToggle");
+
+// Khởi tạo nút theo màu mặc định
+colorToggle.classList.add(playerColor);
+colorToggle.textContent = playerColor === "black" ? "Đen" : "Trắng";
+
+// Khi click đổi màu
+colorToggle.onclick = () => {
+  if (playerColor === "black") {
+    playerColor = "white";
+    aiColor = "black";
+  } else {
+    playerColor = "black";
+    aiColor = "white";
+  }
+  colorToggle.className = playerColor; // cập nhật class
+  colorToggle.textContent = playerColor === "black" ? "Đen" : "Trắng";
+
+  // Khởi tạo lại bàn cờ
+  initGrid();
+};
 
 // --- Toggle lượt đi trước ---
 document.getElementById('toggleFirst').onclick = () => {
@@ -178,30 +277,28 @@ document.getElementById('toggleFirst').onclick = () => {
 // --- Chơi lại ---
 document.getElementById('reset').onclick = () => initGrid();
 
-// --- Thumbnail 2x2 ---
-function renderThumbs(){
+// --- Thumbnail ---
+function renderThumbs() {
   const thumbs = document.querySelectorAll('.thumb');
-  thumbs.forEach(t=>{
+  thumbs.forEach(t => {
     const boardName = t.dataset.board;
     const blocked = BOARD_CONFIGS[boardName];
     t.innerHTML = '';
-    const size = 20; // mỗi ô thumbnail 15px
+    const size = 20;
     const canvas = document.createElement('canvas');
-    canvas.width = size*2;
-    canvas.height = size*2;
+    canvas.width = size * 2;
+    canvas.height = size * 2;
     const ctx = canvas.getContext('2d');
-
     ctx.fillStyle = '#107010';
-    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const positions = [[0,0],[1,0],[0,1],[1,1]]; // 2x2 góc trên bên trái
-    positions.forEach(([col,row])=>{
-      const label = String.fromCharCode(65+row) + (col+1);
-      if(blocked.includes(label)){
-        ctx.fillStyle = '#d9543f';
+    const positions = [[0,0],[1,0],[0,1],[1,1]];
+    positions.forEach(([col,row]) => {
+      const label = String.fromCharCode(65 + row) + (col + 1);
+      if(blocked.includes(label)) {
+        ctx.fillStyle = 'rgba(176,48,48,0.7)';
         ctx.fillRect(col*size,row*size,size,size);
       } else {
-        // Vẽ quân mặc định nếu rơi vào vị trí 2x2
         if((row===3 && col===3)||(row===4 && col===4)){
           ctx.fillStyle='white';
           ctx.beginPath();
@@ -219,20 +316,13 @@ function renderThumbs(){
   });
 }
 
-// --- Chọn bàn cờ bằng thumbnail ---
-document.querySelectorAll('.thumb').forEach(el=>{
-  el.onclick=()=>{
-    document.querySelectorAll('.thumb').forEach(t=>t.classList.remove('selected'));
+document.querySelectorAll('.thumb').forEach(el => {
+  el.onclick = () => {
+    document.querySelectorAll('.thumb').forEach(t => t.classList.remove('selected'));
     el.classList.add('selected');
     initGrid(el.dataset.board);
-  }
+  };
 });
+
 // --- Khởi tạo lần đầu ---
-document.addEventListener('DOMContentLoaded', () => {
-  // Chọn thumbnail mặc định
-  const defaultThumb = document.querySelector('.thumb[data-board="default"]');
-  if(defaultThumb) defaultThumb.classList.add('selected');
-  
-  // Render bàn cờ mặc định
-  initGrid('default');
-});
+initGrid();
