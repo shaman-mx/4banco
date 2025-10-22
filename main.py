@@ -1,19 +1,29 @@
-from flask import Flask, render_template, request, jsonify
-from ai_modules.ai import get_best_move_from_grid
-import traceback
+import os
 import sys
 import logging
-import os
+import traceback
+from flask import Flask, render_template, request, jsonify
+from ai_modules.ai import get_best_move_from_grid
 
+# ------------------------------
+# Cấu hình Flask
+# ------------------------------
 app = Flask(__name__)
 
-# Bật debug log chi tiết
-app.debug = True
-logging.basicConfig(level=logging.DEBUG)
+# Logging đầy đủ, in ra console
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 
+# ------------------------------
+# Routes
+# ------------------------------
 @app.route("/")
 def index():
     return render_template("index.html")
+
 
 @app.route("/ai_move", methods=["POST"])
 def ai_move():
@@ -42,8 +52,11 @@ def ai_move():
         app.logger.error(f"💥 Lỗi xử lý /ai_move: {e}\n{tb}")
         return jsonify({"status": "error", "message": str(e), "trace": tb}), 500
 
+# ------------------------------
+# Entry point local (dev only)
+# ------------------------------
 if __name__ == "__main__":
-    # In log rõ ràng ra console
     sys.stdout.reconfigure(line_buffering=True)
-    print("🚀 Flask server khởi động tại port 81 (DEBUG ON)...")
-    app.run(host="0.0.0.0", port=81, debug=True)
+    PORT = int(os.environ.get("PORT", 10000))
+    print(f"🚀 Flask development server khởi động tại port {PORT} (DEBUG ON)...")
+    app.run(host="0.0.0.0", port=PORT, debug=True)
