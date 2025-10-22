@@ -43,7 +43,10 @@ function initGrid(boardName=currentBoard) {
   updateScore();
   highlightMoves();
 
-  if (currentTurn === aiColor) aiPlay();
+  if (currentTurn === aiColor && validMoves(aiColor).length > 0) {
+    setTimeout(() => aiPlay(), 100);
+  }
+
   renderThumbs();
 }
 
@@ -125,102 +128,34 @@ async function handleMove(x, y) {
   const moves = validMoves(playerColor);
   const move = moves.find(m => m.x === x && m.y === y);
   if (!move) return;
-
   applyMove(x, y, playerColor, move.flips);
-
   currentTurn = aiColor;
   highlightMoves();
-
-  // AI đi hoặc pass nếu hết nước
   if (validMoves(aiColor).length > 0) {
     setTimeout(() => aiPlay(), 100);
   } else {
     currentTurn = playerColor;
     highlightMoves();
-    if (validMoves(playerColor).length === 0) gameOver();
   }
 }
 
 // --- AI đi ---
-// --- AI đi (có debug) ---
 async function aiPlay() {
-  console.log("🤖 Bắt đầu AI play, màu:", aiColor);
-  const moves = validMoves(aiColor);
-  if (moves.length === 0) {
-    console.log("❌ AI không có nước hợp lệ, chuyển lại người chơi.");
-    currentTurn = playerColor;
-    highlightMoves();
-    if (validMoves(playerColor).length === 0) gameOver();
-    return;
-  }
-
   const depth = parseInt(depthSelect.value);
-  console.log("📤 Gửi yêu cầu tới server /ai_move với độ sâu:", depth);
-
-  try {
-    const res = await fetch("/ai_move", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ grid, depth, aiColor })
-    });
-
-    console.log("📥 Phản hồi HTTP status:", res.status);
-    if (!res.ok) {
-      const txt = await res.text();
-      console.error("❌ Lỗi khi fetch AI move:", txt);
-      alert("Server lỗi hoặc không phản hồi!");
-      return;
-    }
-
-    const data = await res.json();
-    console.log("✅ Dữ liệu trả về từ Flask:", data);
-
-    if (data.status === "error") {
-      alert("AI gặp lỗi: " + data.message);
-      console.error(data.message);
-      return;
-    }
-
-    const move = data.move;
-    if (!move) {
-      console.log("⚠️ Không có nước hợp lệ từ AI (pass turn).");
-      currentTurn = playerColor;
-      highlightMoves();
-      return;
-    }
-
-    const m = moves.find(mv => mv.x === move[0] && mv.y === move[1]);
-    if (!m) {
-      console.warn("⚠️ AI chọn ô không hợp lệ:", move);
-      currentTurn = playerColor;
-      highlightMoves();
-      return;
-    }
-
-    console.log("🎯 AI đánh ô:", m);
-    applyMove(m.x, m.y, aiColor, m.flips);
-    currentTurn = playerColor;
-    highlightMoves();
-
-    if (validMoves(playerColor).length === 0) {
-      currentTurn = aiColor;
-      if (validMoves(aiColor).length === 0) gameOver();
-      else setTimeout(() => aiPlay(), 100);
-    }
-  } catch (err) {
-    console.error("💥 Lỗi kết nối fetch /ai_move:", err);
-    alert("Không thể kết nối server!");
-  }
-}
-// --- Game kết thúc ---
-function gameOver() {
-  const white = parseInt(whiteScoreEl.textContent);
-  const black = parseInt(blackScoreEl.textContent);
-  let msg;
-  if (white > black) msg = `Trắng thắng ${white} - ${black}`;
-  else if (black > white) msg = `Đen thắng ${black} - ${white}`;
-  else msg = `Hòa ${white} - ${black}`;
-  alert(msg);
+  const res = await fetch("/ai_move", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ grid, depth, aiColor })
+  });
+  const data = await res.json();
+  const move = data.move;
+  if (!move) { currentTurn = playerColor; highlightMoves(); return; }
+  const moves = validMoves(aiColor);
+  const m = moves.find(m => m.x === move[0] && m.y === move[1]);
+  if (!m) { currentTurn = playerColor; highlightMoves(); return; }
+  applyMove(m.x, m.y, aiColor, m.flips);
+  currentTurn = playerColor;
+  highlightMoves();
 }
 
 // --- Chọn màu cờ ---
@@ -243,7 +178,7 @@ document.getElementById('toggleFirst').onclick = () => {
 // --- Chơi lại ---
 document.getElementById('reset').onclick = () => initGrid();
 
-// --- Thumbnail ---
+// --- Thumbnail 2x2 ---
 function renderThumbs(){
   const thumbs = document.querySelectorAll('.thumb');
   thumbs.forEach(t=>{
@@ -255,17 +190,18 @@ function renderThumbs(){
     canvas.width = size*2;
     canvas.height = size*2;
     const ctx = canvas.getContext('2d');
+
     ctx.fillStyle = '#107010';
     ctx.fillRect(0,0,canvas.width,canvas.height);
 
-    // Chỉ vẽ 2x2 ô góc trên bên trái
-    const positions = [[0,0],[1,0],[0,1],[1,1]];
+    const positions = [[0,0],[1,0],[0,1],[1,1]]; // 2x2 góc trên bên trái
     positions.forEach(([col,row])=>{
       const label = String.fromCharCode(65+row) + (col+1);
       if(blocked.includes(label)){
-        ctx.fillStyle = 'rgba(176,48,48,0.7)'; // đỏ dịu với opacity 70% // ô blocked màu đỏ
+        ctx.fillStyle = '#d9543f';
         ctx.fillRect(col*size,row*size,size,size);
       } else {
+        // Vẽ quân mặc định nếu rơi vào vị trí 2x2
         if((row===3 && col===3)||(row===4 && col===4)){
           ctx.fillStyle='white';
           ctx.beginPath();
@@ -282,6 +218,8 @@ function renderThumbs(){
     t.appendChild(canvas);
   });
 }
+
+// --- Chọn bàn cờ bằng thumbnail ---
 document.querySelectorAll('.thumb').forEach(el=>{
   el.onclick=()=>{
     document.querySelectorAll('.thumb').forEach(t=>t.classList.remove('selected'));
@@ -289,6 +227,12 @@ document.querySelectorAll('.thumb').forEach(el=>{
     initGrid(el.dataset.board);
   }
 });
-
 // --- Khởi tạo lần đầu ---
-initGrid();
+document.addEventListener('DOMContentLoaded', () => {
+  // Chọn thumbnail mặc định
+  const defaultThumb = document.querySelector('.thumb[data-board="default"]');
+  if(defaultThumb) defaultThumb.classList.add('selected');
+  
+  // Render bàn cờ mặc định
+  initGrid('default');
+});

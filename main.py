@@ -1,99 +1,49 @@
 from flask import Flask, render_template, request, jsonify
-import copy
-import os
+from ai_modules.ai import get_best_move_from_grid
+import traceback
+import sys
+import logging
 
 app = Flask(__name__)
 
-SIZE = 8
-DIRECTIONS = [
-    (1, 0), (-1, 0), (0, 1), (0, -1),
-    (1, 1), (1, -1), (-1, 1), (-1, -1)
-]
+# Bật debug log chi tiết
+app.debug = True
+logging.basicConfig(level=logging.DEBUG)
 
-@app.route('/')
-def home():
-    return render_template('index.html')
+@app.route("/")
+def index():
+    return render_template("index.html")
 
-@app.route('/ai_move', methods=['POST'])
+@app.route("/ai_move", methods=["POST"])
 def ai_move():
-    data = request.get_json()
-    grid = data['grid']
-    depth = data.get('depth', 3)
-    ai_color = data.get('aiColor', 'white')  # lấy màu AI từ client
-    move = best_move(grid, ai_color, depth)
-    return jsonify({'move': move})
+    try:
+        data = request.get_json(force=True)
+        app.logger.debug(f"📩 Nhận request /ai_move: {data}")
 
-def find_flips(grid, x, y, color):
-    if grid[y][x]:
-        return []
-    flips = []
-    for dx, dy in DIRECTIONS:
-        nx, ny = x + dx, y + dy
-        temp = []
-        while 0 <= nx < SIZE and 0 <= ny < SIZE:
-            p = grid[ny][nx]
-            if not p:
-                break
-            if p == color:
-                if temp:
-                    flips += temp
-                break
-            temp.append((nx, ny))
-            nx += dx
-            ny += dy
-    return flips
+        grid = data.get("grid")
+        ai_color = data.get("aiColor")
+        depth = data.get("depth", 4)
 
-def valid_moves(grid, color):
-    moves = []
-    for y in range(SIZE):
-        for x in range(SIZE):
-            flips = find_flips(grid, x, y, color)
-            if flips:
-                moves.append({'x': x, 'y': y, 'flips': flips})
-    return moves
+        if not grid or not ai_color:
+            msg = "Thiếu grid hoặc aiColor"
+            app.logger.error(f"⚠️ {msg}")
+            return jsonify({"status": "error", "message": msg}), 400
 
-def apply_move(grid, x, y, color, flips):
-    new_grid = copy.deepcopy(grid)
-    new_grid[y][x] = color
-    for fx, fy in flips:
-        new_grid[fy][fx] = color
-    return new_grid
+        app.logger.info(f"🧠 AI đang tính nước đi... màu={ai_color}, depth={depth}")
 
-def score_grid(grid, color):
-    return sum(row.count(color) for row in grid)
+        move = get_best_move_from_grid(grid, ai_color, requested_depth=depth, time_limit=10)
+        app.logger.info(f"✅ AI trả về move: {move}")
 
-def opposite(color):
-    return 'black' if color == 'white' else 'white'
+        return jsonify({"status": "ok", "move": move})
 
-def minimax(grid, color, depth, maximizing):
-    moves = valid_moves(grid, color)
-    if depth == 0 or not moves:
-        return score_grid(grid, color) - score_grid(grid, opposite(color)), None
+    except Exception as e:
+        tb = traceback.format_exc()
+        app.logger.error(f"💥 Lỗi xử lý /ai_move: {e}\n{tb}")
+        return jsonify({"status": "error", "message": str(e), "trace": tb}), 500
 
-    best_move = None
-    if maximizing:
-        max_eval = -float('inf')
-        for m in moves:
-            new_grid = apply_move(grid, m['x'], m['y'], color, m['flips'])
-            eval_score, _ = minimax(new_grid, opposite(color), depth-1, False)
-            if eval_score > max_eval:
-                max_eval = eval_score
-                best_move = (m['x'], m['y'])
-        return max_eval, best_move
-    else:
-        min_eval = float('inf')
-        for m in moves:
-            new_grid = apply_move(grid, m['x'], m['y'], color, m['flips'])
-            eval_score, _ = minimax(new_grid, opposite(color), depth-1, True)
-            if eval_score < min_eval:
-                min_eval = eval_score
-                best_move = (m['x'], m['y'])
-        return min_eval, best_move
-
-def best_move(grid, color, depth=3):
-    _, move = minimax(grid, color, depth, True)
-    return move
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    # In log rõ ràng ra console
+    sys.stdout.reconfigure(line_buffering=True)
+    print("🚀 Flask server khởi động tại port 81 (DEBUG ON)...")
+    app.run(host="0.0.0.0", port=81, debug=True)

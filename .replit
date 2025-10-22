@@ -3,6 +3,7 @@ modules = ["python-3.11"]
 
 [nix]
 channel = "stable-25_05"
+packages = ["zip"]
 
 [unitTest]
 language = "python3"
@@ -22,11 +23,11 @@ localPort = 81
 externalPort = 3000
 
 [[ports]]
-localPort = 8080
+localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 5000
+localPort = 8080
 externalPort = 80
 
 [workflows]
