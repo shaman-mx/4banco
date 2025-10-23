@@ -2,7 +2,7 @@ import os
 import sys
 import logging
 import traceback
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, send_from_directory, render_template, request, jsonify
 from ai_modules.ai import get_best_move_from_grid
 
 # ------------------------------
@@ -24,6 +24,9 @@ logging.basicConfig(
 def index():
     return render_template("index.html")
 
+@app.route('/ads.txt')
+def ads_txt():
+    return send_from_directory('static', 'ads.txt')
 
 @app.route("/ai_move", methods=["POST"])
 def ai_move():
